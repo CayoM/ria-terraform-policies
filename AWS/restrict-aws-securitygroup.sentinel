@@ -1,65 +1,67 @@
-# Import Terraform Plan Data
 import "tfplan/v2" as tfplan
 
 # --- Security Group Resources ---
 sg_resources = filter tfplan.resource_changes as _, rc {
-    rc.type is "aws_security_group" and
-        (rc.change.actions contains "create" or rc.change.actions contains "update")
+	rc.type is "aws_security_group" and
+		(rc.change.actions contains "create" or rc.change.actions contains "update")
 }
 
 # --- Allowed Ports ---
 allowed_tcp_ports = [
-    22, 
-    80, 
-    443, 
-    6443, 
-    9090, 
-    55671, 
-    30080,
+	22,
+	80,
+	443,
+	6443,
+	9090,
+	55671,
+	30080,
 ]
 
 allowed_udp_ports = [
-    161, 
-    162,
+	161,
+	162,
 ]
 
-# --- Optional: allowed CIDRs (hier: private Netze + definierte Ranges) ---
+# --- Optional: allowed CIDRs ---
 allowed_cidrs = [
-    "10.0.0.0/8",
-    "172.16.0.0/12",
-    "192.168.0.0/16",
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
 ]
 
-# --- Rule: check allowed ingress ports ---
-allowed_sg_ports = rule {
-    all sg_resources as _, sg {
-        all sg.change.after.ingress as _, ingress {
-            protocol = ingress.protocol
-            from     = ingress.from_port
-            to       = ingress.to_port
-            cidrs    = ingress.cidr_blocks
+# --- Helper function to check one ingress rule ---
+ingress_allowed = func(ingress) {
+	return (ingress.protocol == "tcp" and
+		ingress.from_port in allowed_tcp_ports and
+		ingress.to_port in allowed_tcp_ports and
+		all ingress.cidr_blocks as _, c { c in allowed_cidrs }) or
+		(ingress.protocol == "udp" and
+			ingress.from_port in allowed_udp_ports and
+			ingress.to_port in allowed_udp_ports and
+			all ingress.cidr_blocks as _, c { c in allowed_cidrs })
+}
 
-            # Allow TCP only if port in allowed_tcp_ports
-            if protocol == "tcp" {
-                from in allowed_tcp_ports and
-                to in allowed_tcp_ports and
-                all cidrs as _, c { c in allowed_cidrs }
-            }
-            # Allow UDP only if port in allowed_udp_ports
-            else if protocol == "udp" {
-                from in allowed_udp_ports and
-                to in allowed_udp_ports and
-                all cidrs as _, c { c in allowed_cidrs }
-            }
-            # Block any other protocol
-            else {
-                false
-            }
-        }
-    }
+# --- Helper rule: check one SG resource ---
+sg_ingress_allowed = func(sg) {
+	# Wenn keine ingress-Regeln existieren → true
+	if not ("ingress" in sg.change.after and sg.change.after.ingress is not null) {
+		return true
+	}
+
+	# Prüfe alle ingress-Regeln
+	return all sg.change.after.ingress as _, ingress {
+		ingress_allowed(ingress)
+	}
+}
+
+# --- Main rule for all security groups ---
+allowed_sg_ports = rule {
+	all sg_resources as _, sg {
+		sg_ingress_allowed(sg)
+	}
 }
 
 # --- Main rule ---
 main = rule {
-    allowed_sg_ports else true
+	allowed_sg_ports
 }
