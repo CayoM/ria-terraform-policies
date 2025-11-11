@@ -10,6 +10,6 @@ policy "restrict-aws-securitygroup" {
 
 mock "tfplan/v2" {
   module {
-    source = "mocks/mock-tfplan-v2.sentinel"
+    source = "./mocks/mock-tfplan-v2.sentinel"
   }
 }
