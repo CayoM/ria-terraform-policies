@@ -1,0 +1,65 @@
+# Import Terraform Plan Data
+import "tfplan/v2" as tfplan
+
+# --- Security Group Resources ---
+sg_resources = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_security_group" and
+        (rc.change.actions contains "create" or rc.change.actions contains "update")
+}
+
+# --- Allowed Ports ---
+allowed_tcp_ports = [
+    22, 
+    80, 
+    443, 
+    6443, 
+    9090, 
+    55671, 
+    30080,
+]
+
+allowed_udp_ports = [
+    161, 
+    162,
+]
+
+# --- Optional: allowed CIDRs (hier: private Netze + definierte Ranges) ---
+allowed_cidrs = [
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+]
+
+# --- Rule: check allowed ingress ports ---
+allowed_sg_ports = rule {
+    all sg_resources as _, sg {
+        all sg.change.after.ingress as _, ingress {
+            protocol = ingress.protocol
+            from     = ingress.from_port
+            to       = ingress.to_port
+            cidrs    = ingress.cidr_blocks
+
+            # Allow TCP only if port in allowed_tcp_ports
+            if protocol == "tcp" {
+                from in allowed_tcp_ports and
+                to in allowed_tcp_ports and
+                all cidrs as _, c { c in allowed_cidrs }
+            }
+            # Allow UDP only if port in allowed_udp_ports
+            else if protocol == "udp" {
+                from in allowed_udp_ports and
+                to in allowed_udp_ports and
+                all cidrs as _, c { c in allowed_cidrs }
+            }
+            # Block any other protocol
+            else {
+                false
+            }
+        }
+    }
+}
+
+# --- Main rule ---
+main = rule {
+    allowed_sg_ports else true
+}
