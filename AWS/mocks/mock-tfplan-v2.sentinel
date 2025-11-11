@@ -1,0 +1,41 @@
+terraform_version = "1.0.1"
+
+resource_changes = {
+    "aws_instance.ubuntu": {
+        "address": "aws_instance.ubuntu",
+        "change": {
+            "actions": [
+                "create",
+            ],
+            "after": {
+                "ami": "ami-0fb1e27304d83032f",
+                "credit_specification":                 [],
+                "disable_api_termination":              null,
+                "ebs_optimized":                        null,
+                "get_password_data":                    false,
+                "hibernation":                          null,
+                "iam_instance_profile":                 null,
+                "instance_initiated_shutdown_behavior": null,
+                "instance_type":                        "t2.micro",
+                "monitoring":                           null,
+                "source_dest_check":                    true,
+                "tags": {
+                    "Name": "Provisioned by Terraform",
+                    "Role": "backend",
+                },
+                "timeouts":         null,
+                "user_data":        null,
+                "user_data_base64": null,
+                "volume_tags":      null,
+            },
+        },
+        "deposed":        "",
+        "index":          null,
+        "mode":           "managed",
+        "module_address": "",
+        "name":           "ubuntu",
+        "provider_name":  "registry.terraform.io/hashicorp/aws",
+        "type":           "aws_instance",
+    },
+    ## ...
+}
